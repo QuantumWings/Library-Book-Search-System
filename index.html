@@ -1,0 +1,681 @@
+<html><head>
+<title>Library Book Search System Metrics</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/9.4.4/math.min.js"></script>
+<style>
+    :root {
+        --primary-color: #3498db;
+        --secondary-color: #2ecc71;
+        --background-color: #ecf0f1;
+        --text-color: #34495e;
+        --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    body, html {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        height: 100%;
+    }
+    .container {
+        display: flex;
+        height: 100vh;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .panel {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: var(--box-shadow);
+        padding: 15px;
+        margin-right: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 300px;
+        flex-shrink: 0;
+    }
+    .chart-container {
+        flex-grow: 2;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    #search-chart {
+        width: 100%;
+        height: 100%;
+    }
+    .results-container {
+        width: 300px;
+        flex-shrink: 0;
+    }
+    .metrics-box {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .slider-container, .input-container {
+        margin-bottom: 10px;
+    }
+    .slider {
+        width: 100%;
+        margin-top: 5px;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 5px;
+        background: #d3d3d3;
+        outline: none;
+        opacity: 0.7;
+        transition: opacity .2s;
+    }
+    .slider:hover {
+        opacity: 1;
+    }
+    .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 15px;
+        height: 15px;
+        background: var(--primary-color);
+        cursor: pointer;
+        border-radius: 50%;
+    }
+    .slider::-moz-range-thumb {
+        width: 15px;
+        height: 15px;
+        background: var(--primary-color);
+        cursor: pointer;
+        border-radius: 50%;
+    }
+    .input-field {
+        width: calc(100% - 10px);
+        padding: 5px;
+        margin-top: 5px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    h1 {
+        font-size: 1.5em;
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: var(--primary-color);
+    }
+    h2 {
+        font-size: 1.2em;
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: var(--secondary-color);
+    }
+    p {
+        margin: 5px 0;
+        font-size: 0.9em;
+        line-height: 1.4;
+    }
+    label {
+        font-size: 0.9em;
+        display: block;
+        margin-bottom: 3px;
+        color: var(--text-color);
+    }
+    #confusion-matrix {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 15px;
+    }
+    .matrix-cell {
+        background-color: rgba(52, 152, 219, 0.1);
+        padding: 10px;
+        text-align: center;
+        font-size: 0.9em;
+        border-radius: 4px;
+    }
+    @media (max-width: 1200px) {
+        body, html {
+            overflow-y: auto;
+        }
+        .container {
+            flex-direction: column;
+            height: auto;
+            min-height: 100vh;
+        }
+        .panel {
+            width: 100%;
+            margin-right: 0;
+            margin-bottom: 20px;
+        }
+        .sidebar, .results-container {
+            width: 100%;
+        }
+        .chart-container {
+            height: 50vh;
+        }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="panel sidebar">
+        <h1>Library Book Search System</h1>
+        <div class="controls">
+            <div class="input-container">
+                <label for="totalBooks">Total Books:</label>
+                <input type="number" id="totalBooks" class="input-field" min="100" max="1000000" value="10000">
+            </div>
+            <div class="input-container">
+                <label for="potterBooks">Potter Books:</label>
+                <input type="number" id="potterBooks" class="input-field" min="1" max="10000" value="100">
+            </div>
+            <div class="slider-container">
+                <label for="threshold">Relevance Threshold: <span id="threshold-value"></span></label>
+                <input type="range" id="threshold" class="slider" min="0" max="1024" step="1" value="500">
+            </div>
+            <div class="slider-container">
+                <label for="a">Efficiency Slope: <span id="a-value"></span></label>
+                <input type="range" id="a" class="slider" min="0" max="0.01" step="0.0001" value="0.002">
+            </div>
+            <div class="slider-container">
+                <label for="b">Efficiency Intercept: <span id="b-value"></span></label>
+                <input type="range" id="b" class="slider" min="-5" max="5" step="0.1" value="0">
+            </div>
+            <div class="slider-container">
+                <label for="k">Search Precision: <span id="k-value"></span></label>
+                <input type="range" id="k" class="slider" min="0" max="0.1" step="0.001" value="0.01">
+            </div>
+            <div class="slider-container">
+                <label for="x0">Search Midpoint: <span id="x0-value"></span></label>
+                <input type="range" id="x0" class="slider" min="0" max="1024" step="1" value="500">
+            </div>
+        </div>
+    </div>
+    <div class="panel chart-container">
+        <div id="search-chart"></div>
+    </div>
+    <div class="panel results-container">
+        <div class="metrics-box">
+            <h2>Search Cases</h2>
+            <p>1. Finding all Potter books in one search: <span id="case1"></span></p>
+            <p>2. Efficiency of finding Potter books: <span id="case2"></span></p>
+        </div>
+        <div class="metrics-box">
+            <h2>True Positive Rate (TPR) / Recall</h2>
+            <p>Value: <span id="tpr"></span></p>
+            <p>Definition: Proportion of actual Potter books successfully found.</p>
+            <p>Formula: TPR = TP / (TP + FN)</p>
+        </div>
+        <div class="metrics-box">
+            <h2>Precision</h2>
+            <p>Value: <span id="precision"></span></p>
+            <p>Definition: Proportion of identified Potter books that are actually Potter books.</p>
+            <p>Formula: Precision = TP / (TP + FP)</p>
+        </div>
+        <div class="metrics-box">
+            <h2>F1 Score</h2>
+            <p>Value: <span id="f1-score"></span></p>
+            <p>Definition: Harmonic mean of Precision and Recall.</p>
+            <p>Formula: F1 = 2 * (Precision * Recall) / (Precision + Recall)</p>
+        </div>
+        <div class="metrics-box">
+            <h2>False Positive Rate (FPR)</h2>
+            <p>Value: <span id="fpr"></span></p>
+            <p>Definition: Proportion of non-Potter books incorrectly identified as Potter books.</p>
+            <p>Formula: FPR = FP / (FP + TN)</p>
+        </div>
+        <div class="metrics-box">
+            <h2>False Negative Rate (FNR)</h2>
+            <p>Value: <span id="fnr"></span></p>
+            <p>Definition: Proportion of Potter books not identified.</p>
+            <p>Formula: FNR = FN / (TP + FN)</p>
+        </div>
+        <div class="metrics-box">
+            <h2>Accuracy</h2>
+            <p>Value: <span id="accuracy"></span></p>
+            <p>Definition: Proportion of all correct identifications.</p>
+            <p>Formula: Accuracy = (TP + TN) / (TP + TN + FP + FN)</p>
+        </div>
+        <div class="metrics-box">
+            <h2>ROC Curve and AUC</h2>
+            <p>AUC: <span id="auc"></span></p>
+            <p>Definition: Area Under the Receiver Operating Characteristic curve.</p>
+        </div>
+        <div class="metrics-box">
+            <h2>PR Curve and Average Precision</h2>
+            <p>Average Precision: <span id="avg-precision"></span></p>
+            <p>Definition: Area under the Precision-Recall curve.</p>
+        </div>
+        <div class="metrics-box">
+            <h2>Confusion Matrix</h2>
+            <div id="confusion-matrix">
+                <div class="matrix-cell">TP: <span id="tp"></span></div>
+                <div class="matrix-cell">FP: <span id="fp"></span></div>
+                <div class="matrix-cell">FN: <span id="fn"></span></div>
+                <div class="matrix-cell">TN: <span id="tn"></span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+class SearchModel {
+    constructor() {
+        this.initializeParameters();
+    }
+
+    initializeParameters() {
+        this.totalBooks = 10000;
+        this.potterBooks = 100;
+        this.threshold = 500;
+        this.a = 0.002;
+        this.b = 0;
+        this.k = 0.02;
+        this.x0 = this.threshold;
+        this.adjustParameters();
+    }
+
+    adjustParameters() {
+        const targetY = 0.5;
+        const tolerance = 0.001;
+        let iterations = 0;
+        const maxIterations = 100;
+
+        while (iterations < maxIterations) {
+            const y_linear = this.a * this.threshold + this.b;
+            const y_sigmoid = 1 / (1 + Math.exp(-this.k * (this.threshold - this.x0)));
+
+            if (Math.abs(y_linear - targetY) < tolerance && Math.abs(y_sigmoid - targetY) < tolerance) {
+                break;
+            }
+
+            this.a += (targetY - y_linear) * 0.0001;
+            this.b += (targetY - y_linear) * 0.1;
+            this.k += (targetY - y_sigmoid) * 0.001;
+            this.x0 += (y_sigmoid - targetY) * 10;
+
+            iterations++;
+        }
+    }
+
+    calculateMetrics() {
+        const x = Array.from({length: 1025}, (_, i) => i);
+        const y_step = x.map(val => val >= this.threshold ? 1 : 0);
+        const y_sigmoid = x.map(val => 1 / (1 + Math.exp(-this.k * (val - this.x0))));
+        
+        const TP = Math.round(y_step.filter((val, i) => val === 1 && y_sigmoid[i] >= 0.5).length * this.potterBooks / 1024);
+        const FP = Math.round(y_step.filter((val, i) => val === 0 && y_sigmoid[i] >= 0.5).length * (this.totalBooks - this.potterBooks) / 1024);
+        const FN = Math.round(y_step.filter((val, i) => val === 1 && y_sigmoid[i] < 0.5).length * this.potterBooks / 1024);
+        const TN = Math.round(y_step.filter((val, i) => val === 0 && y_sigmoid[i] < 0.5).length * (this.totalBooks - this.potterBooks) / 1024);
+
+        const precision = TP / (TP + FP) || 0;
+        const recall = TP / (TP + FN) || 0;
+        const f1_score = 2 * (precision * recall) / (precision + recall) || 0;
+        const accuracy = (TP + TN) / (TP + TN + FP + FN) || 0;
+        const fpr = FP / (FP + TN) || 0;
+        const fnr = FN / (TP + FN) || 0;
+
+        const auc = this.calculateAUC(x, y_sigmoid);
+
+        const avgPrecision = this.calculateAveragePrecision(x, y_sigmoid, y_step);
+
+        return { 
+            precision, 
+            recall, 
+            f1_score, 
+            accuracy, 
+            fpr, 
+            fnr, 
+            TP, 
+            FP, 
+            FN, 
+            TN, 
+            auc,
+            avgPrecision
+        };
+    }
+
+    calculateAUC(x, y_sigmoid) {
+        let auc = 0;
+        for (let i = 1; i < x.length; i++) {
+            auc += (y_sigmoid[i] + y_sigmoid[i-1]) * (x[i] - x[i-1]) / 2;
+        }
+        return auc / (x[x.length-1] - x[0]);
+    }
+
+    calculateAveragePrecision(x, y_sigmoid, y_step) {
+        let avgPrecision = 0;
+        let truePositives = 0;
+        for (let i = 0; i < x.length; i++) {
+            if (y_step[i] === 1) {
+                truePositives++;
+                avgPrecision += truePositives / (i + 1);
+            }
+        }
+        return avgPrecision / truePositives;
+    }
+
+    calculateCase1() {
+        return `${(this.threshold / 1024 * 100).toFixed(2)}% chance of finding all Potter books`;
+    }
+
+    calculateCase2() {
+        return `${(this.a * this.threshold + this.b).toFixed(2)}% efficiency in finding Potter books`;
+    }
+}
+
+class SearchView {
+    constructor() {
+        this.chart = null;
+    }
+
+    updateSliderValue(id, value) {
+        document.getElementById(`${id}-value`).textContent = value;
+    }
+
+    updateMetrics(metrics) {
+        document.getElementById('precision').textContent = metrics.precision.toFixed(4);
+        document.getElementById('tpr').textContent = metrics.recall.toFixed(4);
+        document.getElementById('f1-score').textContent = metrics.f1_score.toFixed(4);
+        document.getElementById('accuracy').textContent = metrics.accuracy.toFixed(4);
+        document.getElementById('fpr').textContent = metrics.fpr.toFixed(4);
+        document.getElementById('fnr').textContent = metrics.fnr.toFixed(4);
+        document.getElementById('tp').textContent = metrics.TP;
+        document.getElementById('fp').textContent = metrics.FP;
+        document.getElementById('fn').textContent = metrics.FN;
+        document.getElementById('tn').textContent = metrics.TN;
+        document.getElementById('auc').textContent = metrics.auc.toFixed(4);
+        document.getElementById('avg-precision').textContent = metrics.avgPrecision.toFixed(4);
+    }
+
+    updateCases(case1, case2) {
+        document.getElementById('case1').textContent = case1;
+        document.getElementById('case2').textContent = case2;
+    }
+
+    updateChart(model) {
+        const x = Array.from({length: 1025}, (_, i) => i);
+        const y_linear = x.map(val => model.a * val + model.b);
+        const y_step = x.map(val => val >= model.threshold ? 1 : 0);
+        const y_sigmoid = x.map(val => 1 / (1 + Math.exp(-model.k * (val - model.x0))));
+
+        const trace1 = {
+            x: x,
+            y: y_linear,
+            mode: 'lines',
+            name: 'Linear Regression',
+            line: { color: '#3498db' }
+        };
+
+        const trace2 = {
+            x: x,
+            y: y_step,
+            mode: 'lines',
+            name: 'Threshold Classifier',
+            line: { color: '#2ecc71' }
+        };
+
+        const trace3 = {
+            x: x,
+            y: y_sigmoid,
+            mode: 'lines',
+            name: 'Sigmoid Function',
+            line: { color: '#e74c3c' }
+        };
+
+        const layout = {
+            title: 'Library Book Search System Performance',
+            xaxis: {
+                title: 'Search Relevance Score',
+                range: [0, 1024],
+            },
+            yaxis: {
+                title: 'Probability of Finding Potter Books',
+                range: [0, 1.1],
+            },
+            showlegend: true,
+            legend: {
+                x: 0.5,
+                y: -0.2,
+                xanchor: 'center',
+                yanchor: 'top',
+                orientation: 'h'
+            },
+            autosize: true,
+            annotations: [
+                {
+                    x: 1024,
+                    y: 1,
+                    xref: 'x',
+                    yref: 'y',
+                    text: `${model.potterBooks} Potter Books`,
+                    showarrow: true,
+                    arrowhead: 2,
+                    ax: -30,
+                    ay: -30
+                },
+                {
+                    x: 0,
+                    y: 0,
+                    xref: 'x',
+                    yref: 'y',
+                    text: `${model.totalBooks} Total Books`,
+                    showarrow: true,
+                    arrowhead: 2,
+                    ax: 30,
+                    ay: 30
+                }
+            ],
+            font: {
+                family: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
+            },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            margin: { t: 50, r: 50, b: 100, l: 50 },
+            hovermode: 'closest'
+        };
+
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToAdd: [
+                {
+                    name: 'Toggle Annotations',
+                    icon: Plotly.Icons.pencil,
+                    click: function(gd) {
+                        const annotations = gd.layout.annotations || [];
+                        const visibility = annotations.length > 0 ? annotations[0].visible : true;
+                        Plotly.relayout(gd, 'annotations[0].visible', !visibility);
+                        Plotly.relayout(gd, 'annotations[1].visible', !visibility);
+                    }
+                },
+                {
+                    name: 'Add Sample Point',
+                    icon: Plotly.Icons.drawcircle,
+                    click: function(gd) {
+                        const x = Math.random() * 1024;
+                        const y = Math.random();
+                        const newPoint = {
+                            x: [x],
+                            y: [y],
+                            mode: 'markers',
+                            type: 'scatter',
+                            marker: { size: 10, color: '#9b59b6' },
+                            name: `Sample (${x.toFixed(2)}, ${y.toFixed(2)})`
+                        };
+                        Plotly.addTraces(gd, newPoint);
+                    }
+                },
+                {
+                    name: 'Toggle Lines',
+                    icon: Plotly.Icons.lineplot,
+                    click: function(gd) {
+                        const update = {
+                            visible: gd.data.map(trace => !trace.visible)
+                        };
+                        Plotly.restyle(gd, update);
+                    }
+                },
+                {
+                    name: 'Add Threshold Line',
+                    icon: Plotly.Icons.drawline,
+                    click: function(gd) {
+                        const x = Math.random() * 1024;
+                        const verticalLine = {
+                            x: [x, x],
+                            y: [0, 1],
+                            mode: 'lines',
+                            line: {color: '#f39c12', width: 2},
+                            name: `Threshold at x=${x.toFixed(2)}`
+                        };
+                        Plotly.addTraces(gd, verticalLine);
+                    }
+                },
+                {
+                    name: 'Reset',
+                    icon: Plotly.Icons.undo,
+                    click: function(gd) {
+                        controller.resetChart();
+                    }
+                }
+            ],
+            modeBarButtonsToRemove: ['toImage', 'sendDataToCloud'],
+            scrollZoom: true,
+            editable: true,
+            dragmode: 'zoom'
+        };
+
+        Plotly.newPlot('search-chart', [trace1, trace2, trace3], layout, config);
+
+        const chart = document.getElementById('search-chart');
+        chart.on('plotly_hover', (eventData) => {
+            const xValue = eventData.points[0].x;
+            const yValue = eventData.points[0].y;
+            Plotly.Fx.hover('search-chart', [
+                {curveNumber: 0, pointNumber: xValue},
+                {curveNumber: 1, pointNumber: xValue},
+                {curveNumber: 2, pointNumber: xValue}
+            ]);
+        });
+
+        chart.on('plotly_click', (eventData) => {
+            const xValue = eventData.points[0].x;
+            const yValue = eventData.points[0].y;
+            const newPoint = {
+                x: [xValue],
+                y: [yValue],
+                mode: 'markers',
+                type: 'scatter',
+                marker: { size: 10, color: '#9b59b6' },
+                name: `Custom (${xValue.toFixed(2)}, ${yValue.toFixed(2)})`
+            };
+            Plotly.addTraces('search-chart', newPoint);
+        });
+    }
+}
+
+class SearchController {
+    constructor(model, view) {
+        this.model = model;
+        this.view = view;
+        this.initEventListeners();
+        this.updateAll();
+        window.addEventListener('resize', () => this.adjustChartSize());
+    }
+
+    initEventListeners() {
+        document.querySelectorAll('.slider').forEach(slider => {
+            slider.addEventListener('input', () => this.handleSliderChange(slider));
+        });
+        document.querySelectorAll('.input-field').forEach(input => {
+            input.addEventListener('change', () => this.handleInputChange(input));
+        });
+    }
+
+    handleSliderChange(slider) {
+        const value = parseFloat(slider.value);
+        this.view.updateSliderValue(slider.id, value);
+        this.model[slider.id] = value;
+        this.updateAll();
+    }
+
+    handleInputChange(input) {
+        const value = parseInt(input.value);
+        if (input.id === 'totalBooks') {
+            this.model.totalBooks = Math.max(100, Math.min(1000000, value));
+            input.value = this.model.totalBooks;
+        } else if (input.id === 'potterBooks') {
+            this.model.potterBooks = Math.max(1, Math.min(this.model.totalBooks, value));
+            input.value = this.model.potterBooks;
+        }
+        this.updateAll();
+    }
+
+    resetChart() {
+        this.model.initializeParameters();
+        document.querySelectorAll('.slider').forEach(slider => {
+            slider.value = this.model[slider.id];
+            this.view.updateSliderValue(slider.id, this.model[slider.id]);
+        });
+        document.getElementById('totalBooks').value = this.model.totalBooks;
+        document.getElementById('potterBooks').value = this.model.potterBooks;
+        this.updateAll();
+        Plotly.deleteTraces('search-chart', [3, 4, 5, 6, 7]);
+    }
+
+    updateAll() {
+        const metrics = this.model.calculateMetrics();
+        this.view.updateMetrics(metrics);
+        const case1 = this.model.calculateCase1();
+        const case2 = this.model.calculateCase2();
+        this.view.updateCases(case1, case2);
+        this.view.updateChart(this.model);
+        this.adjustChartSize();
+    }
+
+    adjustChartSize() {
+        const chartContainer = document.querySelector('.chart-container');
+        const searchChart = document.getElementById('search-chart');
+        
+        if (chartContainer && searchChart) {
+            const containerWidth = chartContainer.clientWidth;
+            const containerHeight = chartContainer.clientHeight;
+            
+            Plotly.relayout('search-chart', {
+                width: containerWidth,
+                height: containerHeight,
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+        }
+    }
+}
+
+const model = new SearchModel();
+const view = new SearchView();
+const controller = new SearchController(model, view);
+
+document.querySelectorAll('.slider').forEach(slider => {
+    const value = model[slider.id];
+    slider.value = value;
+    view.updateSliderValue(slider.id, value);
+});
+
+document.getElementById('totalBooks').value = model.totalBooks;
+document.getElementById('potterBooks').value = model.potterBooks;
+
+controller.updateAll();
+
+setTimeout(() => {
+    controller.adjustChartSize();
+}, 100);
+
+window.addEventListener('resize', () => {
+    controller.adjustChartSize();
+});
+</script>
+</body>
+</html>
